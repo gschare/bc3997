@@ -2,6 +2,7 @@
 Hi Mark!
 
 ## Homework 1
+[A brute-force inductive synthesizer for arithmetic expressions.](homework1/)
 
 ## Homework 2
 
