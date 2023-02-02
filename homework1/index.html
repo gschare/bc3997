@@ -16,7 +16,7 @@
                     of them.
                     </p>
                     <p>
-                    Restrictions: integers from 1 to 9.
+                    Restrictions: integers from 0 to 9.
                     </p>
                     <p>
                     Due to the exponentially increasing sizes, the synthesizer
@@ -62,10 +62,17 @@
                     I saw a talk by Nadia Polikarpova that introduced inductive synthesis with a bottom-up approach.
                     I follow that algorithm here:
                     <ol>
-                        <li>Maintain a table of input/output examples</li>
-                        <li>Initialize the table of programs with 
+                        <li>Maintain a table of input/output examples.</li>
+                        <li>Initialize the table of programs with the terminals of "size 1"&mdash;that is, integers and variables.</li>
+                        <li>Search the program table for a program which satisfies all of the examples.</li>
+                        <li>If there is no such program, construct all possible programs that combine two existing programs with one of the arithmetic functions.</li>
+                        <li>Repeat 3-4 until a correct program is found or the system is overwhelmed by exponential growth 😬</li>
                     </ol>
                     </p>
+                    <p>
+                    Whenever a new example is added, we go back to step 3.
+                    </p>
+                    <p>Dividing by zero poses no problem here because JavaScript is a beautiful language that simply returns <code>undefined</code> in the case of division by zero, which is structurally not equal to any integer.</p>
                 </div>
             </div>
         </div>
