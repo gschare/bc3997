@@ -1,0 +1,94 @@
+body {
+    font-family: Tahoma, sans-serif;
+    color: #444;
+}
+
+label {
+    text-align: center;
+}
+
+.collapsible {
+    text-align: left;
+    width: 100%;
+    outline: none;
+    cursor: pointer;
+    color: #444;
+    background-color: #ccccff;
+    padding: 8px;
+    border: none;
+    font-size: 1.2em;
+    border-radius: 3px;
+}
+
+.active, .collapsible:hover {
+    background-color: #b3b3ff;
+}
+
+.collapsible:after {
+    content: '\02795'; /* + */
+    float: right;
+    margin-left: 5px;
+}
+
+.active:after {
+    content: "\2796";
+}
+
+.content {
+    font-size: 1em;
+    display: none;
+    overflow: hidden;
+    padding: 5px 10px;
+    background-color: #e6e6ff;
+}
+
+div.main {
+    max-width: 50%;
+    height: 80%;
+    border: 3px solid navy;
+    padding: 10px 20px;
+    margin: auto;
+}
+
+@media screen and (max-width: 800px) {
+    div.main {
+        max-width: 100%;
+    }
+}
+
+#form {
+    margin: 1em 0;
+}
+
+#divinput, #divoutput, #divsubmit {
+    font-size: 1.2em;
+    text-align: center;
+    display: inline-block;
+}
+
+input {
+    width: 3em;
+    text-align: center;
+    padding: 3px 8px;
+    color: #444;
+}
+
+#submit {
+    width: 5em;
+/*
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    background-color: #ccccff;
+    border: none;
+    font-size: large;
+}
+*/
+
+#blurb {
+    margin: 0 0 1em 0;
+}
+
+#explanation {
+    margin: 1em 0 0 0;
+}

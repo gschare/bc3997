@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <head>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div class="main">
+            <div id="blurb">
+                <h3 style="font-weight: normal"><b>ICE</b>: The <b>I</b>ndu<b>C</b>tive Synth<b>E</b>sizer</h3>
+                <button type="button" class="collapsible">Instructions</button>
+                <div class="content">
+                    <p>
+                    Enter input and output pairs into the boxes below. The synthesizer
+                    will remember each pair and produce a function that satisfies all
+                    of them.
+                    </p>
+                    <p>
+                    Restrictions: integers from 1 to 9.
+                    </p>
+                    <p>
+                    Due to the exponentially increasing sizes, the synthesizer
+                    will likely struggle to generate programs of size 4 or higher.
+                    There is a hard cap at size 5 because this gets into
+                    unimaginably high numbers and I don't want to crash your browser.
+                    </p>
+                    <p>
+                    Refresh the page to forget all previous pairs.
+                    </p>
+                </div>
+            </div>
+
+            <div id="form">
+                <form onsubmit="submitForm(this); return false">
+                    <div id="divinput">
+                        <label for="input">Input</label><br/>
+                        <input type="text" id="input" name="input">
+                    </div>
+                    <div id="divoutput">
+                        <label for="output">Output</label><br/>
+                        <input type="text" id="output" name="output">
+                    </div>
+                    <div id="divsubmit">
+                        <input type="submit" id="submit" value="Submit">
+                    </div>
+                </form>
+            </div>
+
+            <div id="examples">
+            </div>
+
+            <div id="function">
+                <p>Function:</p>
+                <pre id="result">
+                </pre>
+            </div>
+
+            <div id="explanation">
+                <button type="button" class="collapsible">How does it work?</button>
+                <div class="content">
+                    <p>
+                    I saw a talk by Nadia Polikarpova that introduced inductive synthesis with a bottom-up approach.
+                    I follow that algorithm here:
+                    <ol>
+                        <li>Maintain a table of input/output examples</li>
+                        <li>Initialize the table of programs with 
+                    </ol>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <script src="app.js"></script>
+    </body>
+</html>
