@@ -28,6 +28,7 @@ import qualified Data.Map as M
 import Control.Monad.State.Lazy ( State(..)
                                 , modify
                                 , evalState
+                                , get
                                 )
 
 main = do
@@ -56,9 +57,9 @@ data BExpr = And BExpr BExpr
            | Or BExpr BExpr
            | Not BExpr
            | BLit Bool
-           | GT IExpr IExpr
-           | LT IExpr IExpr
-           | EQ IExpr IExpr
+           | Gt IExpr IExpr
+           | Lt IExpr IExpr
+           | Eq IExpr IExpr
            | BVar Id
     deriving (Show, Read)
 
@@ -92,7 +93,7 @@ synthesize :: Example -> Expr
 synthesize (Example (input, output)) =
     let inputT = infer input
         outputT = infer output
-        in evalState 0
+        in head $ evalState (findExprOfType $ ArrT inputT outputT) 0
 
 -- don't worry about the holes
 -- use haskell type constructors
@@ -109,15 +110,16 @@ findExprOfType BoolT =
         (BExpr $ BLit False) : (BExpr $ BLit True) :
         concat [ map BExpr [And x y, Or x y, Not x] |
                  x <- findExprOfType BoolT, y <- findExprOfType BoolT ] ++
-        concat [ map BExpr [GT x y, LT x y, EQ x y] |
+        concat [ map BExpr [Gt x y, Lt x y, Eq x y] |
                  x <- findExprOfType IntT, y <- findExprOfType IntT ]
 findExprOfType (ListT t) = do
     v <- getFresh
     return $
-        (LExpr $ LLit []) :
-        (LExpr $ Filter (LExpr $ Lam (LVar v) (findExprOfType BoolT))
-        (LExpr $ Map (LExpr $ Lam (LVar v) (findExprOfType BoolT))
-        (LExpr $ Foldl (LExpr $ Lam (LVar v) (findExprOfType BoolT))
+        [ (LExpr $ LLit [])
+        --, (LExpr $ Filter (LExpr $ Lam (LVar v) (findExprOfType BoolT)))
+        --, (LExpr $ Map (LExpr $ Lam (LVar v) (findExprOfType BoolT)))
+        --, (LExpr $ Foldl (LExpr $ Lam (LVar v) (findExprOfType BoolT)))
+        ]
 findExprOfType AnyT = error "cannot generate infinite type..."
 
 infer :: Expr -> Type
