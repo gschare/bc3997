@@ -30,14 +30,25 @@ import Control.Monad.State.Lazy ( State(..)
                                 , evalState
                                 , get
                                 )
+import Control.Monad            ( unless
+                                , guard
+                                )
+
+synthLoop :: [Example] -> IO ()
+synthLoop exs = do
+    s <- getLine
+    unless (null s) $ do
+        let (e :: Example) = Example . read $ s
+        let exs' = e:exs
+        putStrLn . show $ synthesize exs'
+        synthLoop exs'
 
 main = do
-    (input :: Expr) <- read <$> getLine
-    (output :: Expr) <- read <$> getLine
-    putStrLn . showExpr $ synthesize (Example (input, output))
+    synthLoop []
 
 newtype Example = Example (Expr, Expr) deriving (Show, Read)
 
+{-
 type Id = String
 
 type Env = M.Map Id Type
@@ -78,14 +89,150 @@ data Expr = Lam Expr Expr
 
 type TExpr = (Type, Expr)
 
+-}
+
+-- Simply-Typed Lambda Calculus
+type TEnv = M.Map Id Type
+type Env = M.Map Id Expr
+
+data Type = IntT | BoolT | ArrT Type Type
+    deriving (Show, Read, Eq)
+
+newtype Id = Id String deriving (Show, Read, Eq)
+
+data UnOp = Not
+   deriving (Show, Read, Eq)
+
+data BinOp = Plus
+           | Minus
+           | Mult
+           | Div
+           | Greater
+           | Lesser
+           | Equal
+           | Or
+           | And
+   deriving (Show, Read, Eq)
+
+data Expr = Var Id
+          | Lam (Id, Type) Expr
+          | App Expr Expr
+          | BLit Bool
+          | ILit Int
+          | Bin BinOp Expr Expr
+          | Un UnOp Expr
+    deriving (Show, Read, Eq)
+
 type Fresh = State Int  -- for generating unique binders
+
+eval :: Env -> Expr -> Maybe a
+eval m e =
+    case e of
+        Var v -> eval m <$> M.lookup v m
+        Lam (v, t1) body ->
+            (infer e >>= \t2 ->
+                guard (t1 == t2)
+                >> (\e -> eval (M.insert v e m) body))
+        BLit b -> Just b
+        ILit i -> Just i
+        Bin op e1 e2 ->
+            case op of
+                Equal -> do
+                    t1 <- infer e1
+                    t2 <- infer e2
+                    guard (t1==t2)
+                    (==) <$> eval m e1 <*> eval m e2
+                Or  -> do
+                    t1 <- infer e1
+                    t2 <- infer e2
+                    guard (all (==BoolT) [t1,t2])
+                    (||) <$> eval m e1 <*> eval m e2
+                And -> do
+                    t1 <- infer e1
+                    t2 <- infer e2
+                    guard (all (==BoolT) [t1,t2])
+                    (&&) <$> eval m e1 <*> eval m e2
+                otherwise -> do
+                    t1 <- infer e1
+                    t2 <- infer e2
+                    guard (all (==IntT) [t1,t2])
+                    let f = case op of
+                                Plus -> (+)
+                                Minus -> (-)
+                                Mult -> (*)
+                                Div -> (div)
+                                Greater -> (>)
+                                Lesser -> (<)
+                    f <$> eval m e1 <*> eval m e2
+        Un Not e -> infer e >>= \t -> guard (t==BoolT) >> Just . not <$> eval m e
+        App f a -> do
+            ArrT t1 t2 <- infer f
+            t3 <- infer a
+            guard (t1 == t3)
+            eval m f <*> eval m a
 
 getFresh :: Fresh Id
 getFresh = do
     i <- get
     modify (+1)
-    return $ "x" ++ (show i)
+    return . Id $ "x" ++ (show i)
 
+infer :: TEnv -> Expr -> Maybe Type
+infer m (Var v) = M.lookup v m
+infer _ (BLit _) = return BoolT
+infer _ (ILit _) = return IntT
+infer m (Lam (v,t) e) = return <$> pure $ ArrT t <*> infer e
+infer m (App f a) = do
+    ArrT t1 t2 <- infer f
+    t3 <- infer a
+    guard (t1 == t3)
+    return t2
+infer _ (Un Not e) = return BoolT
+infer _ (Bin Plus _ _) = return IntT
+infer _ (Bin Minus _ _) = return IntT
+infer _ (Bin Mult _ _) = return IntT
+infer _ (Bin Div _ _) = return IntT
+infer _ (Bin Greater _ _) = return BoolT
+infer _ (Bin Lesser _ _) = return BoolT
+infer _ (Bin Equal _ _) = return BoolT
+infer _ (Bin Or _ _) = return BoolT
+infer _ (Bin And _ _) = return BoolT
+
+synthesize :: [Example] -> Expr
+synthesize [] = error "no examples provided"
+synthesize exs =
+    let Example (i,o) = head exs
+        exprs = exprOfType (ArrT (infer i) (infer o)) 0
+        sat = all (\(Example (i,o)) -> eval M.empty i == o) exs
+        goodExprs = filter sat exprs
+    in head goodExprs
+
+exprOfType :: Type -> Fresh [Expr]
+exprOfType BoolT = return [False, True] -- TODO: primitives (And, Or, Not)
+exprOfType IntT = return $ [0..] -- TODO: primitives (Plus, Minus, etc)
+exprOfType (ArrT t1 t2) = undefined
+    {-
+    do v <- getFresh
+        Lam (v, BoolT) 
+        Lam (v, IntT)
+        Lam (v, ArrT)
+    -}
+        -- TODO: bodies for various types using the previously-generated
+        --       expressions
+        -- TODO: something with typed holes to make it top-down?
+        -- Maybe reorganize it instead of a function that returns expressions
+        -- of types, have a function that returns primitives with holes, and
+        -- then the synthesizer has a helper function that recursively fills in
+        -- those holes by calling the primitive-hole generator.
+
+{-
+   Examples:
+(BLit True, BLit False)
+(BLit False, BLit True)
+(BLit True, 
+-}
+
+{-
 showExpr :: Expr -> String
 showExpr = undefined
 
@@ -132,5 +279,6 @@ infer (LExpr (LLit (x:xs))) = ListT (infer x)
 infer (LExpr (LVar _)) = ListT AnyT
 infer (IExpr _) = IntT
 infer (BExpr _) = BoolT
+-}
 
 -- (Lam (IExpr (IVar "x")) (IExpr (Add (ILit 1) (IVar "x"))))
