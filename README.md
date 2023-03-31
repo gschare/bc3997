@@ -7,6 +7,8 @@ Hi Mark!
 ## Homework 2
 [A top-down type-directed synthesizer for simple list operations in Haskell.](homework2/)
 
+See comments for details on implementation and issues.
+
 ## Homework 3
 [Solving the Zebra Problem with SMT-LIBv2.](homework3/)
 
