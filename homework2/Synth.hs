@@ -1,26 +1,6 @@
--- Bottom-Up Inductive Synthesizer with Elimination of Equivalents
--- Supports input/output examples of integer arithmetic
--- Generates programs using integers and +,-,*,/
--- Notable limitation: synthesized programs can only use integers 0-9
-
--- Broad strokes, I want to
---  - take input of a number of input/output examples
---  - parse these
---  - generate programs that satisfy them using the inductive synthesis method
---    with elimination of equivalents
---  - lazily print out valid programs that satisfy the examples until user stops it
-
-
-
-
-
-
-
-
 -- Top-Down Explicit-Search Type-Directed Synthesis
 -- TESTS
--- Supports input/output examples of integer arithmetic and lists
--- Only one example at a time, sorry. Lists are hard.
+-- Supports sets of input/output examples of Booleans and integers
 
 module Synth ( synthesize ) where
 
@@ -33,6 +13,7 @@ import Control.Monad.State.Lazy ( State(..)
 import Control.Monad            ( unless
                                 , guard
                                 )
+import Data.Maybe               ( fromJust )
 
 synthLoop :: [Example] -> IO ()
 synthLoop exs = do
@@ -48,57 +29,19 @@ main = do
 
 newtype Example = Example (Expr, Expr) deriving (Show, Read)
 
-{-
-type Id = String
-
-type Env = M.Map Id Type
-
-data Type = IntT | BoolT | ListT Type | ArrT Type Type | AnyT
-    deriving (Show, Read)
-
-data IExpr = Add IExpr IExpr
-           | Mul IExpr IExpr
-           | Sub IExpr IExpr
-           | Div IExpr IExpr
-           | ILit Int
-           | IVar Id
-    deriving (Show, Read)
-
-data BExpr = And BExpr BExpr
-           | Or BExpr BExpr
-           | Not BExpr
-           | BLit Bool
-           | Gt IExpr IExpr
-           | Lt IExpr IExpr
-           | Eq IExpr IExpr
-           | BVar Id
-    deriving (Show, Read)
-
-data LExpr = Filter Expr Expr
-           | Map Expr Expr
-           | Foldl Expr Expr Expr
-           | LLit [Expr]
-           | LVar Id
-    deriving (Show, Read)
-
-data Expr = Lam Expr Expr
-          | LExpr LExpr
-          | IExpr IExpr
-          | BExpr BExpr
-    deriving (Show, Read)
-
-type TExpr = (Type, Expr)
-
--}
-
 -- Simply-Typed Lambda Calculus
-type TEnv = M.Map Id Type
 type Env = M.Map Id Expr
 
-data Type = IntT | BoolT | ArrT Type Type
+-- ArrT n t1 t2: n is maximum depth
+-- i.e. a -> b has depth 1
+--      a -> b -> c has depth 2
+--      a -> (b -> c) -> d also has depth 2
+-- types t1 and t2 are the input and ouput types (the first and last)
+-- basically depth is the arity of the function after uncurrying
+data Type = IntT | BoolT | ArrT Int Type Type
     deriving (Show, Read, Eq)
 
-newtype Id = Id String deriving (Show, Read, Eq)
+newtype Id = Id String deriving (Show, Read, Eq, Ord)
 
 data UnOp = Not
    deriving (Show, Read, Eq)
@@ -121,40 +64,41 @@ data Expr = Var Id
           | ILit Int
           | Bin BinOp Expr Expr
           | Un UnOp Expr
+          | Hole Type
     deriving (Show, Read, Eq)
 
 type Fresh = State Int  -- for generating unique binders
 
-eval :: Env -> Expr -> Maybe a
+eval :: (Eq a) => Env -> Expr -> Maybe a
 eval m e =
     case e of
-        Var v -> eval m <$> M.lookup v m
+        Var v -> M.lookup v m >>= \e -> eval m e
         Lam (v, t1) body ->
-            (infer e >>= \t2 ->
+            (infer m e >>= \t2 ->
                 guard (t1 == t2)
-                >> (\e -> eval (M.insert v e m) body))
+                >> (Just (\e -> fromJust $ eval (M.insert v e m) body)))
         BLit b -> Just b
         ILit i -> Just i
         Bin op e1 e2 ->
             case op of
                 Equal -> do
-                    t1 <- infer e1
-                    t2 <- infer e2
+                    t1 <- infer m e1
+                    t2 <- infer m e2
                     guard (t1==t2)
                     (==) <$> eval m e1 <*> eval m e2
                 Or  -> do
-                    t1 <- infer e1
-                    t2 <- infer e2
+                    t1 <- infer m e1
+                    t2 <- infer m e2
                     guard (all (==BoolT) [t1,t2])
                     (||) <$> eval m e1 <*> eval m e2
                 And -> do
-                    t1 <- infer e1
-                    t2 <- infer e2
+                    t1 <- infer m e1
+                    t2 <- infer m e2
                     guard (all (==BoolT) [t1,t2])
                     (&&) <$> eval m e1 <*> eval m e2
                 otherwise -> do
-                    t1 <- infer e1
-                    t2 <- infer e2
+                    t1 <- infer m e1
+                    t2 <- infer m e2
                     guard (all (==IntT) [t1,t2])
                     let f = case op of
                                 Plus -> (+)
@@ -164,12 +108,13 @@ eval m e =
                                 Greater -> (>)
                                 Lesser -> (<)
                     f <$> eval m e1 <*> eval m e2
-        Un Not e -> infer e >>= \t -> guard (t==BoolT) >> Just . not <$> eval m e
+        Un Not e -> infer m e >>= \t -> guard (t==BoolT) >> not <$> eval m e
         App f a -> do
-            ArrT t1 t2 <- infer f
-            t3 <- infer a
+            ArrT n t1 t2 <- infer m f
+            t3 <- infer m a
             guard (t1 == t3)
             eval m f <*> eval m a
+        Hole t -> error "cannot evaluate typed hole"
 
 getFresh :: Fresh Id
 getFresh = do
@@ -177,14 +122,14 @@ getFresh = do
     modify (+1)
     return . Id $ "x" ++ (show i)
 
-infer :: TEnv -> Expr -> Maybe Type
-infer m (Var v) = M.lookup v m
+infer :: Env -> Expr -> Maybe Type
+infer m (Var v) = M.lookup v m >>= \e -> infer m e
 infer _ (BLit _) = return BoolT
 infer _ (ILit _) = return IntT
-infer m (Lam (v,t) e) = return <$> pure $ ArrT t <*> infer e
+infer m (Lam (v,t) e) = infer m e >>= \t2 -> Just $ ArrT 1 t t2
 infer m (App f a) = do
-    ArrT t1 t2 <- infer f
-    t3 <- infer a
+    ArrT n t1 t2 <- infer m f
+    t3 <- infer m a
     guard (t1 == t3)
     return t2
 infer _ (Un Not e) = return BoolT
@@ -197,20 +142,41 @@ infer _ (Bin Lesser _ _) = return BoolT
 infer _ (Bin Equal _ _) = return BoolT
 infer _ (Bin Or _ _) = return BoolT
 infer _ (Bin And _ _) = return BoolT
+infer _ (Hole t) = return t
 
 synthesize :: [Example] -> Expr
 synthesize [] = error "no examples provided"
 synthesize exs =
     let Example (i,o) = head exs
-        exprs = exprOfType (ArrT (infer i) (infer o)) 0
-        sat = all (\(Example (i,o)) -> eval M.empty i == o) exs
+        -- maximum depth 5
+        exprs = evalState (exprOfType (ArrT 5 (fromJust $ infer M.empty i) (fromJust $ infer M.empty o))) 0
+        sat e = all (\(Example (i,o)) -> fromJust (eval M.empty (App e i)) == fromJust (eval M.empty o)) exs
+        -- Remove holes?!
         goodExprs = filter sat exprs
     in head goodExprs
 
 exprOfType :: Type -> Fresh [Expr]
-exprOfType BoolT = return [False, True] -- TODO: primitives (And, Or, Not)
-exprOfType IntT = return $ [0..] -- TODO: primitives (Plus, Minus, etc)
-exprOfType (ArrT t1 t2) = undefined
+exprOfType BoolT = return [ BLit False
+                          , BLit True
+                          , Hole BoolT
+                          , Un Not (Hole BoolT)
+                          , Bin Or (Hole BoolT) (Hole BoolT)
+                          , Bin And (Hole BoolT) (Hole BoolT)
+                          , Bin Greater (Hole IntT) (Hole IntT)
+                          , Bin Lesser (Hole IntT) (Hole IntT)
+                          , Bin Equal (Hole BoolT) (Hole BoolT)
+                          , Bin Equal (Hole IntT) (Hole IntT)
+                          , App (Hole $ ArrT 3 BoolT BoolT) (Hole BoolT)
+                          , App (Hole $ ArrT 3 IntT BoolT) (Hole IntT)
+                          ]
+exprOfType IntT = return $ (ILit <$> [0..10]) ++
+    [ Hole IntT
+    , Bin Plus (Hole IntT) (Hole IntT)
+    , Bin Minus (Hole IntT) (Hole IntT)
+    , Bin Mult (Hole IntT) (Hole IntT)
+    , Bin Div (Hole IntT) (Hole IntT)
+    ]
+exprOfType (ArrT n t1 t2) = undefined
     {-
     do v <- getFresh
         Lam (v, BoolT) 
@@ -230,55 +196,6 @@ exprOfType (ArrT t1 t2) = undefined
 (BLit True, BLit False)
 (BLit False, BLit True)
 (BLit True, 
--}
-
-{-
-showExpr :: Expr -> String
-showExpr = undefined
-
-synthesize :: Example -> Expr
-synthesize (Example (input, output)) =
-    let inputT = infer input
-        outputT = infer output
-        in head $ evalState (findExprOfType $ ArrT inputT outputT) 0
-
--- don't worry about the holes
--- use haskell type constructors
--- do enumeration of the options using list comprehension
-
-findExprOfType :: Type -> Fresh [Expr]
-findExprOfType IntT =
-    return $
-        [ IExpr $ ILit i | i <- [0..9] ] ++
-        concat [ map IExpr [Add x y, Mul x y, Sub x y, Div x y] |
-                 x <- findExprOfType IntT, y <- findExprOfType IntT ]
-findExprOfType BoolT =
-    return $
-        (BExpr $ BLit False) : (BExpr $ BLit True) :
-        concat [ map BExpr [And x y, Or x y, Not x] |
-                 x <- findExprOfType BoolT, y <- findExprOfType BoolT ] ++
-        concat [ map BExpr [Gt x y, Lt x y, Eq x y] |
-                 x <- findExprOfType IntT, y <- findExprOfType IntT ]
-findExprOfType (ListT t) = do
-    v <- getFresh
-    return $
-        [ (LExpr $ LLit [])
-        --, (LExpr $ Filter (LExpr $ Lam (LVar v) (findExprOfType BoolT)))
-        --, (LExpr $ Map (LExpr $ Lam (LVar v) (findExprOfType BoolT)))
-        --, (LExpr $ Foldl (LExpr $ Lam (LVar v) (findExprOfType BoolT)))
-        ]
-findExprOfType AnyT = error "cannot generate infinite type..."
-
-infer :: Expr -> Type
-infer (Lam v e) = ArrT (infer v) (infer e)
-infer (LExpr (Filter f xs)) = infer xs
-infer (LExpr (Map f xs)) = let ArrT _ t = infer f in ListT t
-infer (LExpr (Foldl f acc xs)) = let ArrT _ t = infer f in t
-infer (LExpr (LLit [])) = ListT AnyT
-infer (LExpr (LLit (x:xs))) = ListT (infer x)
-infer (LExpr (LVar _)) = ListT AnyT
-infer (IExpr _) = IntT
-infer (BExpr _) = BoolT
 -}
 
 -- (Lam (IExpr (IVar "x")) (IExpr (Add (ILit 1) (IVar "x"))))
