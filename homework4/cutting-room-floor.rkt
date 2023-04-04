@@ -59,3 +59,8 @@
            (
            (choose + - *) (arith x (- depth 1)) (arith x (- depth 1))))
   )
+
+; At first my function holes looked like this:
+  (choose (arith x)
+          ((choose + * -) (arith x) (arith x))))
+; but I didn't know why this worked and nothing else did.

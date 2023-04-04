@@ -57,11 +57,18 @@ symbols. This amounts to little more than writing a quick `eval` function and
 making sure you interpret the results before comparing them against the spec.
 It is easy to extend this, thanks to Rosette's and Racket's flexibility.
 
-Each of the synthesized functions `f`, `g`, and `h` would produce `UNSAT` if I
+At first,
+each of the synthesized functions `f`, `g`, `h`, and `j` would produce `UNSAT` if I
 did not give them a choice between the starting rule of the grammar and a
 binary operation with each operand being a grammar rule. I have no idea why
-this is the case. It's probably a mistake in my grammar. In any case, it
-appears to be minor and it works.
+this was the case. It's probably a mistake in my grammar. In any case, I
+checked the documentation and found that you could add a `#:depth` argument to
+a hole, and this seems to have fixed the issue. You can see the cutting room
+floor file for the earlier versions.
+
+The synthesizer occasionally comes up with somewhat hilarious solutions to the
+problems, for example producing the function `h(x) = -22x` for doubling the
+argument modulo 12. Since `-22` is indeed `2` modulo 12, this actually works.
 
 ## Takeaways
 I appreciate the flexibility of Rosette. I ended up only using the safe subset

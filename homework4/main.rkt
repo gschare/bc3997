@@ -28,6 +28,13 @@
 (define (spec-id-formula impl x)
   (assert (equal? (impl x) x)))
 
+(define (spec-random impl x)
+  ; x |-> x * 3 - 2
+  (assert (equal? (impl 2) 4))
+  (assert (equal? (impl 3) 7))
+  (assert (equal? (impl 5) 13))
+  )
+
 ; "Tokens" for the target language
 (define-struct plus (x y) #:transparent)
 (define-struct minus (x y) #:transparent)
@@ -65,19 +72,16 @@
 
 ; The functions we want to synthesize, and what subset of the grammar to use
 (define (f x)
-  (choose (arith x)
-          ((choose + * -) (arith x) (arith x))))
+  (arith x))
 
 (define (g x)
-  (choose (arith x)
-          ((choose + * -) (arith x) (arith x))))
+  (arith x #:depth 1))
 
 (define (h x)
-  (choose (mod-arith x)
-          ((choose plus minus mult) (mod-arith x) (mod-arith x))))
+  (mod-arith x #:depth 1))
 
-; Behavioral specification
-;(define spec spec-square)
+(define (j x)
+  (arith x #:depth 2))
 
 ; Input space
 (define-symbolic x integer?)
@@ -91,6 +95,7 @@
                      (spec-square g x)
                      (spec-square-formula g x)
                      (spec-double-mod h x 12)
+                     (spec-random j x)
                      )
     ))
 
