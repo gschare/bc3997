@@ -1,12 +1,8 @@
 #lang rosette/safe
+(require rosette/lib/synthax)   ; grammars
+(require rosette/lib/destruct)  ; pattern matching
 
-(require rosette/lib/synthax)
-(require rosette/lib/destruct)
-
-(define-struct plus (x y) #:transparent)
-(define-struct minus (x y) #:transparent)
-(define-struct mult (x y) #:transparent)
-
+; Interpreter for the target language
 (define (eval e)
   (destruct e
     [(plus x y) (+ (eval x) (eval y))]
@@ -14,13 +10,20 @@
     [(minus x y) (- (eval x) (eval y))]
     [_ e]))
 
+; "Tokens" for the target language
+(define-struct plus (x y) #:transparent)
+(define-struct minus (x y) #:transparent)
+(define-struct mult (x y) #:transparent)
+
+; Grammar for the target language
 (define-grammar (arith x)
+  [op (choose + - *)]
   [expr
     (choose (?? integer?)
             x
-            (* (expr) (expr))
-            (- (expr) (expr))
-            (+ (expr) (expr)))])
+            ((op) (expr) (expr))
+            ((op) (expr) (expr))
+            ((op) (expr) (expr)))])
 
 ; Some example behavioral specifications for f
 (define (spec-square x)
@@ -43,7 +46,7 @@
 (define (f x) (arith x))
 
 ; Behavioral specification
-(define spec spec-square-formula)
+;(define spec spec-square)
 
 ; Input space
 (define-symbolic x integer?)
@@ -52,7 +55,7 @@
 (define solution
   (synthesize
     #:forall (list x)
-    #:guarantee (spec x)
+    #:guarantee (spec-id x)
     ))
 
 ; Results
@@ -60,3 +63,18 @@
   (begin (print-forms solution)
          (equal? (f 2) 9))
   (display "UNSAT\n"))
+
+; Synthesize 2
+(define solution2
+  (synthesize
+    #:forall (list x)
+    #:guarantee (spec-square x)
+    ))
+
+; Results
+(if (sat? solution2)
+  (begin (print-forms solution2)
+         (equal? (f 2) 9))
+  (display "UNSAT\n"))
+
+(evaluate f solution)
