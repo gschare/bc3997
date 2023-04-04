@@ -13,3 +13,4 @@ See comments for details on implementation and issues.
 [Solving the Zebra Problem with SMT-LIBv2.](homework3/)
 
 ## Homework 4
+[Using Rosette](homework4/)
