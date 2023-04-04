@@ -2,62 +2,79 @@
 (require rosette/lib/synthax)   ; grammars
 (require rosette/lib/destruct)  ; pattern matching
 
-; Interpreter for the target language
-(define (eval e)
-  (destruct e
-    [(plus x y) (+ (eval x) (eval y))]
-    [(mult x y) (* (eval x) (eval y))]
-    [(minus x y) (- (eval x) (eval y))]
-    [_ e]))
+; Grammar for the target language
+(define-grammar (arith x)
+  [expr
+    (choose (?? integer?)
+            x
+            (+ (expr) (expr))
+            (- (expr) (expr))
+            (* (expr) (expr)))])
+
+; Some example behavioral specifications
+(define (spec-square impl x)
+  (assert (equal? (impl 0) 0))
+  (assert (equal? (impl 1) 1))
+  (assert (equal? (impl 2) 4))
+  (assert (equal? (impl 3) 9)))
+
+(define (spec-square-formula impl x)
+  (assert (equal? (impl x) (* x x))))
+
+(define (spec-id impl x)
+  (assert (equal? (impl 2) 2))
+  (assert (equal? (impl 3) 3)))
+
+(define (spec-id-formula impl x)
+  (assert (equal? (impl x) x)))
 
 ; "Tokens" for the target language
 (define-struct plus (x y) #:transparent)
 (define-struct minus (x y) #:transparent)
 (define-struct mult (x y) #:transparent)
 
+; Simple interpreter in group Z/n
+; This essentially enables alternate semantics
+(define (eval-mod e n)
+  (destruct e
+    [(plus x y) (modulo
+                  (+ (eval-mod x n) (eval-mod y n))
+                  n)]
+    [(mult x y) (modulo
+                  (* (eval-mod x n) (eval-mod y n))
+                  n)]
+    [(minus x y) (modulo
+                   (- (eval-mod x n) (eval-mod y n))
+                   n)]
+    [_ (modulo e n)]))
+
 ; Grammar for the target language
- (define-grammar (arith x)
-   ;[op (choose + - *)]
-   [expr
-     (choose (?? integer?)
-             x
-             (+ (expr) (expr))
-             (- (expr) (expr))
-             (* (expr) (expr)))])
+(define-grammar (mod-arith x)
+  [expr
+    (choose (?? integer?)
+            x
+            (plus (expr) (expr))
+            (mult (expr) (expr))
+            (minus (expr) (expr)))])
 
-;(define-synthax ops ([(ops) (choose + - *)]))
+(define (spec-double-mod impl x n)
+  (assume (<= 0 x))
+  (assume (< x n))
+  (assert (equal? (eval-mod (impl x) n)
+                  (modulo (+ x x) n))))
 
-;(define-synthax (arith x depth)
-;  #:base (choose x (?? integer?))
-;  #:else (choose
-;           x
-;           (?? integer?)
-;           (
-;           (choose + - *) (arith x (- depth 1)) (arith x (- depth 1))))
-;  )
-
-; Some example behavioral specifications for f
-(define (spec-square x)
-  (assert (equal? (f 0) 0))
-  (assert (equal? (f 1) 1))
-  (assert (equal? (f 2) 4))
-  (assert (equal? (f 3) 9)))
-
-(define (spec-square-formula x)
-  (assert (equal? (f x) (* x x))))
-
-(define (spec-id x)
-  (assert (equal? (f 2) 2))
-  (assert (equal? (f 3) 3)))
-
-(define (spec-id-formula x)
-  (assert (equal? (f x) x)))
-
-; The function we want to synthesize, and what subset of the grammar it can use
+; The functions we want to synthesize, and what subset of the grammar to use
 (define (f x)
-  ;((choose + * -) (arith x) (arith x))
-  (choose (arith x) ((choose + * -) (arith x) (arith x)))
-  )
+  (choose (arith x)
+          ((choose + * -) (arith x) (arith x))))
+
+(define (g x)
+  (choose (arith x)
+          ((choose + * -) (arith x) (arith x))))
+
+(define (h x)
+  (choose (mod-arith x)
+          ((choose plus minus mult) (mod-arith x) (mod-arith x))))
 
 ; Behavioral specification
 ;(define spec spec-square)
@@ -69,22 +86,15 @@
 (define solution
   (synthesize
     #:forall (list x)
-    #:guarantee (spec-id x)
+    #:guarantee (and (spec-id f x)
+                     (spec-id-formula f x)
+                     (spec-square g x)
+                     (spec-square-formula g x)
+                     (spec-double-mod h x 12)
+                     )
     ))
 
 ; Results
 (if (sat? solution)
   (print-forms solution)
-  (display "UNSAT\n"))
-
-; Synthesize 2
-(define solution2
-  (synthesize
-    #:forall (list x)
-    #:guarantee (spec-square x)
-    ))
-
-; Results
-(if (sat? solution2)
-  (print-forms solution2)
   (display "UNSAT\n"))
