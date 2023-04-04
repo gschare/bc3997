@@ -16,14 +16,25 @@
 (define-struct mult (x y) #:transparent)
 
 ; Grammar for the target language
-(define-grammar (arith x)
-  [op (choose + - *)]
-  [expr
-    (choose (?? integer?)
-            x
-            ((op) (expr) (expr))
-            ((op) (expr) (expr))
-            ((op) (expr) (expr)))])
+ (define-grammar (arith x)
+   ;[op (choose + - *)]
+   [expr
+     (choose (?? integer?)
+             x
+             (+ (expr) (expr))
+             (- (expr) (expr))
+             (* (expr) (expr)))])
+
+;(define-synthax ops ([(ops) (choose + - *)]))
+
+;(define-synthax (arith x depth)
+;  #:base (choose x (?? integer?))
+;  #:else (choose
+;           x
+;           (?? integer?)
+;           (
+;           (choose + - *) (arith x (- depth 1)) (arith x (- depth 1))))
+;  )
 
 ; Some example behavioral specifications for f
 (define (spec-square x)
@@ -43,7 +54,10 @@
   (assert (equal? (f x) x)))
 
 ; The function we want to synthesize, and what subset of the grammar it can use
-(define (f x) (arith x))
+(define (f x)
+  ;((choose + * -) (arith x) (arith x))
+  (choose (arith x) ((choose + * -) (arith x) (arith x)))
+  )
 
 ; Behavioral specification
 ;(define spec spec-square)
@@ -60,8 +74,7 @@
 
 ; Results
 (if (sat? solution)
-  (begin (print-forms solution)
-         (equal? (f 2) 9))
+  (print-forms solution)
   (display "UNSAT\n"))
 
 ; Synthesize 2
@@ -73,8 +86,5 @@
 
 ; Results
 (if (sat? solution2)
-  (begin (print-forms solution2)
-         (equal? (f 2) 9))
+  (print-forms solution2)
   (display "UNSAT\n"))
-
-(evaluate f solution)
