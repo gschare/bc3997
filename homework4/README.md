@@ -6,6 +6,12 @@ were sparse. Moreover, lots of the documentation and tutorials were out of
 date. The result was that I completed the assignment by a large amount of trial
 and error.
 
+## TL;DR
+* [`main.rkt`](./main.rkt): demonstrates synthesis of arithmetic functions
+* [`algebra.rkt`](./algebra.rkt): demonstrates solving algebraic equations
+* [`cutting-room-floor.rkt`](./cutting-room-floor.rkt): all my failed attempts
+* [`sat.rkt`](./sat.rkt): *not my work!* - Emina Torlak's example
+
 ## Overview
 Rosette allows you to synthesize programs in a number of ways. Much of the
 documentation focuses on verification, sketching, and _angelic execution_. Angelic
@@ -26,6 +32,11 @@ the code comments in my script, [`main.rkt`](./main.rkt).
 
 The function to synthesize is `f`, and its body is just a hole that refers to
 the grammar defined earlier in the file.
+
+I also wrote a file demonstrating the use of Rosette for solving algebraic
+equations: [`algebra.rkt`](./algebra.rkt). It leverages the `solve` procedure
+rather than the `synthesize` procedure, as it is concerned with figuring out
+the concrete values of symbolic values rather than filling holes in a sketch.
 
 ## Approach ("How did we get here?")
 I began by trying out various examples from the documentation, to varying
